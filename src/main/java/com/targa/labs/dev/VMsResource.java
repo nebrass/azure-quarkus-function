@@ -1,5 +1,7 @@
 package com.targa.labs.dev;
 
+import com.azure.resourcemanager.compute.models.VirtualMachine;
+
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -15,7 +17,7 @@ public class VMsResource {
 
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    public List<String> getAvailableVMs() {
+    public List<VmDTO> getAvailableVMs() {
         return azureVmManager.getAvailableVMs();
     }
 }

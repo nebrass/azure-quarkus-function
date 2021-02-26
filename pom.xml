@@ -19,7 +19,7 @@
     <resources-plugin.version>3.1.0</resources-plugin.version>
     <surefire-plugin.version>3.0.0-M5</surefire-plugin.version>
 
-    <azure.functions.maven.plugin.version>1.9.1</azure.functions.maven.plugin.version>
+    <azure.functions.maven.plugin.version>1.9.2</azure.functions.maven.plugin.version>
     <functionAppName>quarkus-function</functionAppName>
     <functionAppRegion>northeurope</functionAppRegion>
     <functionResourceGroup>helloworld-rg</functionResourceGroup>
