@@ -23,7 +23,7 @@
     <functionAppName>quarkus-function</functionAppName>
     <functionAppRegion>northeurope</functionAppRegion>
     <functionResourceGroup>helloworld-rg</functionResourceGroup>
-    <function>helloworld</function>
+    <function>azure-resources-handler</function>
     <stagingDirectory>${project.build.directory}/azure-functions/${functionAppName}</stagingDirectory>
     <quarkus.package.type>uber-jar</quarkus.package.type>
   </properties>
@@ -55,6 +55,12 @@
     </dependency>
 
     <dependency>
+      <groupId>org.projectlombok</groupId>
+      <artifactId>lombok</artifactId>
+      <version>1.18.18</version>
+    </dependency>
+
+    <dependency>
       <groupId>com.azure</groupId>
       <artifactId>azure-identity</artifactId>
       <version>1.2.3</version>
@@ -63,6 +69,17 @@
       <groupId>com.azure.resourcemanager</groupId>
       <artifactId>azure-resourcemanager</artifactId>
       <version>2.2.0</version>
+    </dependency>
+    <dependency>
+      <groupId>com.azure</groupId>
+      <artifactId>azure-cosmos</artifactId>
+      <version>4.12.0</version>
+    </dependency>
+
+    <dependency>
+      <groupId>com.microsoft.azure.functions</groupId>
+      <artifactId>azure-functions-java-library</artifactId>
+      <version>1.4.2</version>
     </dependency>
 
     <dependency>
@@ -167,7 +184,7 @@
             </goals>
             <configuration>
               <overwrite>true</overwrite>
-              <outputDirectory>${stagingDirectory}/helloworld</outputDirectory>
+              <outputDirectory>${stagingDirectory}/quarkus-function</outputDirectory>
               <resources>
                 <resource>
                   <directory>${project.basedir}/azure-config</directory>

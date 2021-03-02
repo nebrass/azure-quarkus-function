@@ -1,60 +1,60 @@
 package com.targa.labs.dev;
 
+import com.azure.core.credential.TokenCredential;
 import com.azure.core.management.AzureEnvironment;
 import com.azure.core.management.profile.AzureProfile;
-import com.azure.identity.ClientSecretCredential;
-import com.azure.identity.ClientSecretCredentialBuilder;
+import com.azure.cosmos.CosmosClient;
+import com.azure.cosmos.CosmosClientBuilder;
+import com.azure.cosmos.CosmosContainer;
+import com.azure.cosmos.models.CosmosQueryRequestOptions;
+import com.azure.identity.DefaultAzureCredentialBuilder;
 import com.azure.resourcemanager.AzureResourceManager;
-import com.azure.resourcemanager.compute.models.VirtualMachine;
 import com.azure.resourcemanager.resources.fluentcore.arm.models.HasName;
 
 import javax.enterprise.context.ApplicationScoped;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @ApplicationScoped
 public class AzureVmManager {
 
-    public List<VmDTO> getAvailableVMs() {
+    public static final String COSMOS_DB_CONNECTION = "CosmosDbConnection";
+    public static final String ACCOUNT_ENDPOINT = "AccountEndpoint";
+    public static final String ACCOUNT_KEY = "AccountKey";
+    public static final String EVENTS_DB_NAME = "events-db";
+    public static final String EVENTS_CONTAINER_NAME = "events";
+    public static final String SELECT_ALL_LOGS_QUERY = "SELECT * FROM c";
 
-        /**
-         * {
-         *   "appId": "e7a385b9-504c-477c-8d51-df7fd0722957",
-         *   "displayName": "QuarkusServicePrincipal",
-         *   "name": "http://QuarkusServicePrincipal",
-         *   "password": "uYE6TEIW.ZvOxZKw7p53.L_HBm9bxr5~sw",
-         *   "tenant": "2cf6bd3b-eb51-47c4-9d5d-06cdf42bb3a6"
-         * }
-         *
-         *
-         * {
-         *   "appId": "ff7a73d2-5898-4a4e-9efc-38cede7b883b",
-         *   "displayName": "quarkus-function",
-         *   "name": "http://quarkus-function",
-         *   "password": "fVDZohU_dY2B_u7_hVK2Rxi96ZKJ1AtZ9h",
-         *   "tenant": "72f988bf-86f1-41af-91ab-2d7cd011db47"
-         *   "subscription": "3f39e493-5d18-4db8-9368-9e3e3ff6975e"
-         * }
-         */
+    private final AzureResourceManager azureResourceManager;
+    private final CosmosContainer cosmosContainer;
 
-        String clientId = System.getenv("CLIENT_ID");
-        String clientSecret = System.getenv("CLIENT_SECRET");
-        String tenantId = System.getenv("TENANT_ID");
-        String subscriptionId = System.getenv("SUBSCRIPTION_ID");
+    public AzureVmManager() {
 
-        ClientSecretCredential clientSecretCredential = new ClientSecretCredentialBuilder()
-                .clientId(clientId)
-                .clientSecret(clientSecret)
-                .tenantId(tenantId)
+        AzureProfile profile = new AzureProfile(AzureEnvironment.AZURE);
+        TokenCredential credential = new DefaultAzureCredentialBuilder()
+                .authorityHost(profile.getEnvironment().getActiveDirectoryEndpoint())
                 .build();
 
-        AzureProfile profile = new AzureProfile(tenantId, subscriptionId, AzureEnvironment.AZURE);
-
-        AzureResourceManager azureResourceManager = AzureResourceManager
-                .authenticate(clientSecretCredential, profile)
+        azureResourceManager = AzureResourceManager
+                .authenticate(credential, profile)
                 .withDefaultSubscription();
 
+        Map<String, String> credentials = getCosmosDbCredentials();
+
+        CosmosClient cosmosClient = new CosmosClientBuilder()
+                .endpoint(credentials.get(ACCOUNT_ENDPOINT))
+                .key(credentials.get(ACCOUNT_KEY))
+                .buildClient();
+
+        cosmosContainer = cosmosClient
+                .getDatabase(EVENTS_DB_NAME)
+                .getContainer(EVENTS_CONTAINER_NAME);
+    }
+
+    public List<VmDTO> getAvailableVMs() {
 
         List<String> rgList = azureResourceManager.resourceGroups()
                 .list()
@@ -78,5 +78,43 @@ public class AzureVmManager {
 
         return vmList;
     }
-}
 
+    public void startVM(VmDTO vmDTO) {
+        azureResourceManager.virtualMachines().start(vmDTO.getResourceGroup(), vmDTO.getName());
+        sendData(
+                new VmEvent(VmEventType.START, vmDTO.getName(), vmDTO.getResourceGroup())
+        );
+    }
+
+    public void stopVM(VmDTO vmDTO) {
+        azureResourceManager.virtualMachines().deallocate(vmDTO.getResourceGroup(), vmDTO.getName());
+        sendData(
+                new VmEvent(VmEventType.STOP, vmDTO.getName(), vmDTO.getResourceGroup())
+        );
+    }
+
+    public void sendData(VmEvent vmEvent) {
+        cosmosContainer.createItem(vmEvent);
+    }
+
+    public List<VmEvent> getLogs() {
+        return cosmosContainer
+                .queryItems(SELECT_ALL_LOGS_QUERY, new CosmosQueryRequestOptions(), VmEvent.class)
+                .stream()
+                .collect(Collectors.toList());
+    }
+
+    private Map<String, String> getCosmosDbCredentials() {
+        Map<String, String> credentials = new HashMap<>();
+
+        String cosmosDbConnection = System.getenv(COSMOS_DB_CONNECTION);
+        String[] elements = cosmosDbConnection.split(";");
+
+        for (String element : elements) {
+            String[] split = element.split("=");
+            credentials.put(split[0], split[1]);
+        }
+
+        return credentials;
+    }
+}
